@@ -1,0 +1,8 @@
+CREATE USER dbuser1 WITH PASSWORD='Straight2016$'
+CREATE USER dbuser2 WITH PASSWORD='Straight2016$'
+
+CREATE TABLE users(id INT IDENTITY PRIMARY KEY,
+name VARCHAR(255),
+email VARCHAR(255) );
+
+SELECT * from Customer;

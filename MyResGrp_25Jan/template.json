@@ -1,0 +1,730 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "namespaces_myserbus_name": {
+            "defaultValue": "myserbus",
+            "type": "String"
+        },
+        "sites_MyTestWebAppHid_name": {
+            "defaultValue": "MyTestWebAppHid",
+            "type": "String"
+        },
+        "components_MyAppinsight_name": {
+            "defaultValue": "MyAppinsight",
+            "type": "String"
+        },
+        "storageAccounts_logstorproj1_name": {
+            "defaultValue": "logstorproj1",
+            "type": "String"
+        },
+        "serverfarms_ServicePlan1a4635b8_912d_name": {
+            "defaultValue": "ServicePlan1a4635b8-912d",
+            "type": "String"
+        },
+        "smartdetectoralertrules_failure_anomalies___myappinsight_name": {
+            "defaultValue": "failure anomalies - myappinsight",
+            "type": "String"
+        },
+        "actiongroups_application_20insights_20smart_20detection_externalid": {
+            "defaultValue": "/subscriptions/a1690716-156f-4127-ab59-9eac0284fe51/resourceGroups/myresgrp_25jan/providers/microsoft.insights/actiongroups/application%20insights%20smart%20detection",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "microsoft.insights/components",
+            "apiVersion": "2015-05-01",
+            "name": "[parameters('components_MyAppinsight_name')]",
+            "location": "westus2",
+            "kind": "web",
+            "properties": {
+                "Application_Type": "web",
+                "Flow_Type": "Redfield",
+                "Request_Source": "IbizaAIExtension"
+            }
+        },
+        {
+            "type": "Microsoft.Relay/namespaces",
+            "apiVersion": "2017-04-01",
+            "name": "[parameters('namespaces_myserbus_name')]",
+            "location": "Central US",
+            "sku": {
+                "name": "Standard",
+                "tier": "Standard"
+            },
+            "properties": {}
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2019-06-01",
+            "name": "[parameters('storageAccounts_logstorproj1_name')]",
+            "location": "centralus",
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "virtualNetworkRules": [],
+                    "ipRules": [],
+                    "defaultAction": "Allow"
+                },
+                "supportsHttpsTrafficOnly": true,
+                "encryption": {
+                    "services": {
+                        "file": {
+                            "keyType": "Account",
+                            "enabled": true
+                        },
+                        "blob": {
+                            "keyType": "Account",
+                            "enabled": true
+                        }
+                    },
+                    "keySource": "Microsoft.Storage"
+                },
+                "accessTier": "Cool"
+            }
+        },
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "name": "[parameters('serverfarms_ServicePlan1a4635b8_912d_name')]",
+            "location": "Central US",
+            "sku": {
+                "name": "S1",
+                "tier": "Standard",
+                "size": "S1",
+                "family": "S",
+                "capacity": 1
+            },
+            "kind": "app",
+            "properties": {
+                "perSiteScaling": false,
+                "maximumElasticWorkerCount": 1,
+                "isSpot": false,
+                "reserved": false,
+                "isXenon": false,
+                "hyperV": false,
+                "targetWorkerCount": 0,
+                "targetWorkerSizeId": 0
+            }
+        },
+        {
+            "type": "microsoft.alertsmanagement/smartdetectoralertrules",
+            "apiVersion": "2019-06-01",
+            "name": "[parameters('smartdetectoralertrules_failure_anomalies___myappinsight_name')]",
+            "location": "global",
+            "dependsOn": [
+                "[resourceId('microsoft.insights/components', parameters('components_MyAppinsight_name'))]"
+            ],
+            "properties": {
+                "description": "Failure Anomalies notifies you of an unusual rise in the rate of failed HTTP requests or dependency calls.",
+                "state": "Enabled",
+                "severity": "Sev3",
+                "frequency": "PT1M",
+                "detector": {
+                    "id": "FailureAnomaliesDetector"
+                },
+                "scope": [
+                    "[resourceId('microsoft.insights/components', parameters('components_MyAppinsight_name'))]"
+                ],
+                "actionGroups": {
+                    "groupIds": [
+                        "[parameters('actiongroups_application_20insights_20smart_20detection_externalid')]"
+                    ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Relay/namespaces/AuthorizationRules",
+            "apiVersion": "2017-04-01",
+            "name": "[concat(parameters('namespaces_myserbus_name'), '/RootManageSharedAccessKey')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Relay/namespaces', parameters('namespaces_myserbus_name'))]"
+            ],
+            "properties": {
+                "rights": [
+                    "Listen",
+                    "Manage",
+                    "Send"
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Relay/namespaces/HybridConnections",
+            "apiVersion": "2017-04-01",
+            "name": "[concat(parameters('namespaces_myserbus_name'), '/mysql-conn')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Relay/namespaces', parameters('namespaces_myserbus_name'))]"
+            ],
+            "properties": {
+                "requiresClientAuthorization": true,
+                "userMetadata": "[[{\"key\":\"endpoint\",\"value\":\"IS-PC-002.ispace.local:1433\"}]"
+            }
+        },
+        {
+            "type": "Microsoft.Relay/namespaces/HybridConnections",
+            "apiVersion": "2017-04-01",
+            "name": "[concat(parameters('namespaces_myserbus_name'), '/mysql-onprem')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Relay/namespaces', parameters('namespaces_myserbus_name'))]"
+            ],
+            "properties": {
+                "requiresClientAuthorization": true,
+                "userMetadata": "[[{\"key\":\"endpoint\",\"value\":\"ISE-LP-116.ispace.local:1433\"}]"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices",
+            "apiVersion": "2019-06-01",
+            "name": "[concat(parameters('storageAccounts_logstorproj1_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_logstorproj1_name'))]"
+            ],
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "properties": {
+                "cors": {
+                    "corsRules": []
+                },
+                "deleteRetentionPolicy": {
+                    "enabled": false
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/fileServices",
+            "apiVersion": "2019-06-01",
+            "name": "[concat(parameters('storageAccounts_logstorproj1_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_logstorproj1_name'))]"
+            ],
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "properties": {
+                "cors": {
+                    "corsRules": []
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2018-11-01",
+            "name": "[parameters('sites_MyTestWebAppHid_name')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_ServicePlan1a4635b8_912d_name'))]"
+            ],
+            "kind": "app",
+            "properties": {
+                "enabled": true,
+                "hostNameSslStates": [
+                    {
+                        "name": "mytestwebapphid.azurewebsites.net",
+                        "sslState": "Disabled",
+                        "hostType": "Standard"
+                    },
+                    {
+                        "name": "mytestwebapphid.scm.azurewebsites.net",
+                        "sslState": "Disabled",
+                        "hostType": "Repository"
+                    }
+                ],
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_ServicePlan1a4635b8_912d_name'))]",
+                "reserved": false,
+                "isXenon": false,
+                "hyperV": false,
+                "scmSiteAlsoStopped": false,
+                "clientAffinityEnabled": true,
+                "clientCertEnabled": false,
+                "hostNamesDisabled": false,
+                "containerSize": 0,
+                "dailyMemoryTimeQuota": 0,
+                "httpsOnly": false,
+                "redundancyMode": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/config",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/web')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]"
+            ],
+            "properties": {
+                "numberOfWorkers": 1,
+                "defaultDocuments": [
+                    "Default.htm",
+                    "Default.html",
+                    "Default.asp",
+                    "index.htm",
+                    "index.html",
+                    "iisstart.htm",
+                    "default.aspx",
+                    "index.php",
+                    "hostingstart.html"
+                ],
+                "netFrameworkVersion": "v4.0",
+                "phpVersion": "5.6",
+                "requestTracingEnabled": false,
+                "remoteDebuggingEnabled": false,
+                "remoteDebuggingVersion": "VS2019",
+                "httpLoggingEnabled": false,
+                "logsDirectorySizeLimit": 35,
+                "detailedErrorLoggingEnabled": false,
+                "publishingUsername": "$MyTestWebAppHid",
+                "scmType": "LocalGit",
+                "use32BitWorkerProcess": true,
+                "webSocketsEnabled": false,
+                "alwaysOn": false,
+                "managedPipelineMode": "Integrated",
+                "virtualApplications": [
+                    {
+                        "virtualPath": "/",
+                        "physicalPath": "site\\wwwroot",
+                        "preloadEnabled": false
+                    }
+                ],
+                "loadBalancing": "LeastRequests",
+                "experiments": {
+                    "rampUpRules": []
+                },
+                "autoHealEnabled": false,
+                "localMySqlEnabled": false,
+                "ipSecurityRestrictions": [
+                    {
+                        "ipAddress": "Any",
+                        "action": "Allow",
+                        "priority": 1,
+                        "name": "Allow all",
+                        "description": "Allow all access"
+                    }
+                ],
+                "scmIpSecurityRestrictions": [
+                    {
+                        "ipAddress": "Any",
+                        "action": "Allow",
+                        "priority": 1,
+                        "name": "Allow all",
+                        "description": "Allow all access"
+                    }
+                ],
+                "scmIpSecurityRestrictionsUseMain": false,
+                "http20Enabled": false,
+                "minTlsVersion": "1.2",
+                "ftpsState": "AllAllowed",
+                "reservedInstanceCount": 0
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/deployments",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/3b7906ee2ad2af34d174ecbd4c7e02ca929c7372')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]"
+            ],
+            "properties": {
+                "status": 4,
+                "author_email": "hidayathullam@ispace.com",
+                "author": "Hidayathulla M A",
+                "deployer": "hidayath8080",
+                "message": "MyThirdCommit2\n",
+                "start_time": "2020-01-25T07:35:45.760862Z",
+                "end_time": "2020-01-25T07:36:02.805446Z",
+                "active": false
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/deployments",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/4042975e14ad3e9a384def889e5e3b2bca04da39')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]"
+            ],
+            "properties": {
+                "status": 4,
+                "author_email": "hidayathullam@ispace.com",
+                "author": "Hidayathulla M A",
+                "deployer": "hidayath8080",
+                "message": "MyThirdCommit\n",
+                "start_time": "2020-01-25T07:13:07.6364954Z",
+                "end_time": "2020-01-25T07:14:11.4937517Z",
+                "active": false
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/deployments",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/8504e6fd3163455256c5e7e267ab307a760fa329')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]"
+            ],
+            "properties": {
+                "status": 4,
+                "author_email": "hidayathullam@ispace.com",
+                "author": "Hidayathulla M A",
+                "deployer": "hidayath8080",
+                "message": "MyThirdCommit2\n",
+                "start_time": "2020-01-25T10:42:16.0808125Z",
+                "end_time": "2020-01-25T10:42:34.9871661Z",
+                "active": true
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/deployments",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/de659b5d59ac47d600afcc9a68ad876b9e399b33')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]"
+            ],
+            "properties": {
+                "status": 4,
+                "author_email": "hidayathullam@ispace.com",
+                "author": "Hidayathulla M A",
+                "deployer": "hidayath8080",
+                "message": "MyThirdCommit2\n",
+                "start_time": "2020-01-25T10:23:05.3671183Z",
+                "end_time": "2020-01-25T10:23:47.9468975Z",
+                "active": false
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/hostNameBindings",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/', parameters('sites_MyTestWebAppHid_name'), '.azurewebsites.net')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]"
+            ],
+            "properties": {
+                "siteName": "MyTestWebAppHid",
+                "hostNameType": "Verified"
+            }
+        },
+        {
+            "type": "Microsoft.Relay/namespaces/HybridConnections/authorizationRules",
+            "apiVersion": "2017-04-01",
+            "name": "[concat(parameters('namespaces_myserbus_name'), '/mysql-conn/defaultListener')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Relay/namespaces/HybridConnections', parameters('namespaces_myserbus_name'), 'mysql-conn')]",
+                "[resourceId('Microsoft.Relay/namespaces', parameters('namespaces_myserbus_name'))]"
+            ],
+            "properties": {
+                "rights": [
+                    "Listen"
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Relay/namespaces/HybridConnections/authorizationRules",
+            "apiVersion": "2017-04-01",
+            "name": "[concat(parameters('namespaces_myserbus_name'), '/mysql-onprem/defaultListener')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Relay/namespaces/HybridConnections', parameters('namespaces_myserbus_name'), 'mysql-onprem')]",
+                "[resourceId('Microsoft.Relay/namespaces', parameters('namespaces_myserbus_name'))]"
+            ],
+            "properties": {
+                "rights": [
+                    "Listen"
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Relay/namespaces/HybridConnections/authorizationRules",
+            "apiVersion": "2017-04-01",
+            "name": "[concat(parameters('namespaces_myserbus_name'), '/mysql-conn/defaultSender')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Relay/namespaces/HybridConnections', parameters('namespaces_myserbus_name'), 'mysql-conn')]",
+                "[resourceId('Microsoft.Relay/namespaces', parameters('namespaces_myserbus_name'))]"
+            ],
+            "properties": {
+                "rights": [
+                    "Send"
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Relay/namespaces/HybridConnections/authorizationRules",
+            "apiVersion": "2017-04-01",
+            "name": "[concat(parameters('namespaces_myserbus_name'), '/mysql-onprem/defaultSender')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Relay/namespaces/HybridConnections', parameters('namespaces_myserbus_name'), 'mysql-onprem')]",
+                "[resourceId('Microsoft.Relay/namespaces', parameters('namespaces_myserbus_name'))]"
+            ],
+            "properties": {
+                "rights": [
+                    "Send"
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+            "apiVersion": "2019-06-01",
+            "name": "[concat(parameters('storageAccounts_logstorproj1_name'), '/default/insights-logs-appservicehttplogs')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccounts_logstorproj1_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_logstorproj1_name'))]"
+            ],
+            "properties": {
+                "publicAccess": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+            "apiVersion": "2019-06-01",
+            "name": "[concat(parameters('storageAccounts_logstorproj1_name'), '/default/insights-metrics-pt1m')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccounts_logstorproj1_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_logstorproj1_name'))]"
+            ],
+            "properties": {
+                "publicAccess": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/slots",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/Staging')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]",
+                "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_ServicePlan1a4635b8_912d_name'))]"
+            ],
+            "kind": "app",
+            "properties": {
+                "enabled": true,
+                "hostNameSslStates": [
+                    {
+                        "name": "mytestwebapphid-staging.azurewebsites.net",
+                        "sslState": "Disabled",
+                        "hostType": "Standard"
+                    },
+                    {
+                        "name": "mytestwebapphid-staging.scm.azurewebsites.net",
+                        "sslState": "Disabled",
+                        "hostType": "Repository"
+                    }
+                ],
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_ServicePlan1a4635b8_912d_name'))]",
+                "reserved": false,
+                "isXenon": false,
+                "hyperV": false,
+                "scmSiteAlsoStopped": false,
+                "clientAffinityEnabled": true,
+                "clientCertEnabled": false,
+                "hostNamesDisabled": false,
+                "containerSize": 0,
+                "dailyMemoryTimeQuota": 0,
+                "httpsOnly": false,
+                "redundancyMode": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/slots/config",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/Staging/web')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites/slots', parameters('sites_MyTestWebAppHid_name'), 'Staging')]",
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]"
+            ],
+            "properties": {
+                "numberOfWorkers": 1,
+                "defaultDocuments": [
+                    "Default.htm",
+                    "Default.html",
+                    "Default.asp",
+                    "index.htm",
+                    "index.html",
+                    "iisstart.htm",
+                    "default.aspx",
+                    "index.php",
+                    "hostingstart.html"
+                ],
+                "netFrameworkVersion": "v4.0",
+                "phpVersion": "5.6",
+                "requestTracingEnabled": false,
+                "remoteDebuggingEnabled": false,
+                "remoteDebuggingVersion": "VS2019",
+                "httpLoggingEnabled": false,
+                "logsDirectorySizeLimit": 35,
+                "detailedErrorLoggingEnabled": false,
+                "publishingUsername": "$mytestwebapphid__Staging",
+                "scmType": "LocalGit",
+                "use32BitWorkerProcess": true,
+                "webSocketsEnabled": false,
+                "alwaysOn": false,
+                "managedPipelineMode": "Integrated",
+                "virtualApplications": [
+                    {
+                        "virtualPath": "/",
+                        "physicalPath": "site\\wwwroot",
+                        "preloadEnabled": false
+                    }
+                ],
+                "loadBalancing": "LeastRequests",
+                "experiments": {
+                    "rampUpRules": []
+                },
+                "autoHealEnabled": false,
+                "localMySqlEnabled": false,
+                "ipSecurityRestrictions": [
+                    {
+                        "ipAddress": "Any",
+                        "action": "Allow",
+                        "priority": 1,
+                        "name": "Allow all",
+                        "description": "Allow all access"
+                    }
+                ],
+                "scmIpSecurityRestrictions": [
+                    {
+                        "ipAddress": "Any",
+                        "action": "Allow",
+                        "priority": 1,
+                        "name": "Allow all",
+                        "description": "Allow all access"
+                    }
+                ],
+                "scmIpSecurityRestrictionsUseMain": false,
+                "http20Enabled": false,
+                "minTlsVersion": "1.2",
+                "ftpsState": "AllAllowed",
+                "reservedInstanceCount": 0
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/slots/deployments",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/Staging/3b7906ee2ad2af34d174ecbd4c7e02ca929c7372')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites/slots', parameters('sites_MyTestWebAppHid_name'), 'Staging')]",
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]"
+            ],
+            "properties": {
+                "status": 4,
+                "author_email": "hidayathullam@ispace.com",
+                "author": "Hidayathulla M A",
+                "deployer": "hidayath8080",
+                "message": "MyThirdCommit2\n",
+                "start_time": "2020-01-25T10:20:34.4564946Z",
+                "end_time": "2020-01-25T10:20:50.7522277Z",
+                "active": true
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/slots/deployments",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/Staging/4042975e14ad3e9a384def889e5e3b2bca04da39')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites/slots', parameters('sites_MyTestWebAppHid_name'), 'Staging')]",
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]"
+            ],
+            "properties": {
+                "status": 4,
+                "author_email": "hidayathullam@ispace.com",
+                "author": "Hidayathulla M A",
+                "deployer": "hidayath8080",
+                "message": "MyThirdCommit\n",
+                "start_time": "2020-01-25T07:06:35.3825757Z",
+                "end_time": "2020-01-25T07:06:52.5362084Z",
+                "active": false
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/slots/deployments",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/Staging/7a27f650226f64c84a410fd5d9385bce1f47982e')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites/slots', parameters('sites_MyTestWebAppHid_name'), 'Staging')]",
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]"
+            ],
+            "properties": {
+                "status": 4,
+                "author_email": "hidayathullam@ispace.com",
+                "author": "Hidayathulla M A",
+                "deployer": "hidayath8080",
+                "message": "MyFirstCommit2\n",
+                "start_time": "2020-01-25T06:24:39.6912745Z",
+                "end_time": "2020-01-25T06:25:02.3367126Z",
+                "active": false
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/slots/deployments",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/Staging/7b04fcc33ea4b54a23d7daf39b77b050234940d9')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites/slots', parameters('sites_MyTestWebAppHid_name'), 'Staging')]",
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]"
+            ],
+            "properties": {
+                "status": 4,
+                "author_email": "hidayathullam@ispace.com",
+                "author": "Hidayathulla M A",
+                "deployer": "hidayath8080",
+                "message": "MyFirstCommit\n",
+                "start_time": "2020-01-25T06:07:38.3146476Z",
+                "end_time": "2020-01-25T06:08:53.0869465Z",
+                "active": false
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/slots/deployments",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/Staging/9a3b8f4afbd03e969317dbb0654441338ea13d9b')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites/slots', parameters('sites_MyTestWebAppHid_name'), 'Staging')]",
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]"
+            ],
+            "properties": {
+                "status": 4,
+                "author_email": "hidayathullam@ispace.com",
+                "author": "Hidayathulla M A",
+                "deployer": "hidayath8080",
+                "message": "MyThirdCommit2\n",
+                "start_time": "2020-01-25T07:34:06.0013Z",
+                "end_time": "2020-01-25T07:34:22.4571615Z",
+                "active": false
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/slots/hostNameBindings",
+            "apiVersion": "2018-11-01",
+            "name": "[concat(parameters('sites_MyTestWebAppHid_name'), '/Staging/', parameters('sites_MyTestWebAppHid_name'), '-staging.azurewebsites.net')]",
+            "location": "Central US",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites/slots', parameters('sites_MyTestWebAppHid_name'), 'Staging')]",
+                "[resourceId('Microsoft.Web/sites', parameters('sites_MyTestWebAppHid_name'))]"
+            ],
+            "properties": {
+                "siteName": "mytestwebapphid(Staging)",
+                "hostNameType": "Verified"
+            }
+        }
+    ]
+}
